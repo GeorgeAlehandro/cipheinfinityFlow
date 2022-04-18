@@ -26,8 +26,8 @@ infinity_flow <- function(
                        path_to_fcs, ## Where the source FCS files are
                        path_to_output, ## Where the results will be stored
                        path_to_intermediary_results=tempdir(), ## Storing intermediary results. Default to a temporary directory. Can be a user-specified directory to store intermediary results (to resume interrupted computation)
-                       backbone_selection_file=NULL, ## Define backbone and exploratory channels. If missing will be defined interactively and the selection will be saved in the output folder under the name backbone_selection_file.csv. To define it the first time you should call select_backbone_and_exploratory_markers(read.files(path_to_fcs,recursive=TRUE)) in an interactive R session 
-                       
+                       backbone_selection_file=NULL, ## Define backbone and exploratory channels. If missing will be defined interactively and the selection will be saved in the output folder under the name backbone_selection_file.csv. To define it the first time you should call select_backbone_and_exploratory_markers(read.files(path_to_fcs,recursive=TRUE)) in an interactive R session
+
 
                        ## Annotation
                        annotation=NULL, ## Named vector with names = files. Use name of input files if missing
@@ -36,11 +36,11 @@ infinity_flow <- function(
                        ## Downsampling
                        input_events_downsampling=Inf, ## Number of cells to downsample to per input FCS file
                        prediction_events_downsampling=1000, ## Number of events to get predictions for per file
-                       
+
                        ## Set-up multicore computing. When in doubt, set it to 1
                        cores=1L,
-                       
-                       ## Setting a random seed (for reproducibility despite stochasticity). We enforce reproducibility for the predictions even when doing multicore comparisons. 
+
+                       ## Setting a random seed (for reproducibility despite stochasticity). We enforce reproducibility for the predictions even when doing multicore comparisons.
                        your_random_seed=123,
                        verbose=TRUE,
 
@@ -88,7 +88,7 @@ infinity_flow <- function(
     name_of_PE_parameter <- settings$name_of_PE_parameter
     paths <- settings$paths
     regression_functions <- settings$regression_functions
-    
+
     ## Subsample FCS files
     M  <-  input_events_downsampling ## Number of cells to downsample to for each file
     ## set.seed(your_random_seed)
@@ -99,14 +99,14 @@ infinity_flow <- function(
         name_of_PE_parameter=name_of_PE_parameter,
         verbose=verbose
     )
-    
+
     ## Automatically scale backbone markers and each PE. ## /!\ This only accomodates a single exploratory measurement
     logicle_transform_input(
         yvar=name_of_PE_parameter,
         paths=paths,
         verbose=verbose
     )
-    
+
     ## Z-score transform each backbone marker for each sample
     standardize_backbone_data_across_wells(
         yvar=name_of_PE_parameter,
@@ -135,17 +135,17 @@ infinity_flow <- function(
         neural_networks_seed=neural_networks_seed,
         regression_functions=regression_functions
     )
-    
+
     ## UMAP dimensionality reduction
     perform_UMAP_dimensionality_reduction(
         paths=paths,
         extra_args_UMAP=extra_args_UMAP,
         verbose=verbose
     )
-    
+
     ## Export of the data and predicted data
     res <- do.call(export_data,c(list(paths=paths,verbose=verbose),extra_args_export))
-    
+
     ## Plotting
     do.call(plot_results,c(list(paths=paths,verbose=verbose),extra_args_plotting))
 
@@ -168,11 +168,11 @@ infinity_flow <- function(
             extra_args_plotting
         )
     )
-        
+
     timings <- cbind(fit=timings_fit$timings,pred=timings_pred$timings)
     rownames(timings) <- names(regression_functions)
     saveRDS(timings,file.path(paths["rds"],"timings.Rds"))
-    
+
     list(raw=res,bgc=res_bgc,timings=timings)
 }
 
@@ -186,8 +186,8 @@ initialize <- function(
                     verbose=TRUE,
                     regression_functions=regression_functions
                     ){
-    
-    
+
+
     if(path_to_intermediary_results==tempdir()){
         tmpdir = path_to_intermediary_results
         if(dir.exists(tmpdir)){
@@ -217,7 +217,6 @@ initialize <- function(
         output=path_to_output
     )
     paths <- vapply(paths, path.expand, "path")
-
     if(!all(dir.exists(paths[-match("annotation",names(paths))]))){
         message(
             paste(
@@ -231,8 +230,12 @@ initialize <- function(
         message("Using directories...")
         lapply(names(paths),function(x){message("\t",x,": ",paths[x])})
     }
-    
-    files <- list.files(path_to_fcs,pattern="^.*.(fcs)$",ignore.case=TRUE,recursive=TRUE)
+    files <- list.files(paths["input"],pattern="^.*.(fcs)$",ignore.case=TRUE,recursive=TRUE)
+    # If there are multiple paths
+    if (!is.na(paths["input1"])){
+
+        files <- list.files(c(paths["input1"],paths["input2"],paths["input3"]),full.names=TRUE,recursive=TRUE,pattern=".fcs")
+    }
     if(missing(annotation)){
         annotation <- setNames(files,files)
     }
@@ -242,8 +245,12 @@ initialize <- function(
     }
     annotation$target <- make.unique(as.character(annotation$target))
     write.csv(annotation,row.names=FALSE,file=paths["annotation"])
-    
-    files <- list.files(path_to_fcs,pattern="^.*.(fcs)$",ignore.case=TRUE,recursive=TRUE,full.names=TRUE)
+    #####################################################################################################
+    files <- list.files(paths["input"],pattern="^.*.(fcs)$",ignore.case=TRUE,recursive=TRUE)
+    if (!is.na(paths["input1"])){
+
+        files <- list.files(c(paths["input1"],paths["input2"],paths["input3"]),full.names=TRUE,recursive=TRUE,pattern=".fcs")
+    }
     if(missing(backbone_selection_file)){
         backbone_definition <- select_backbone_and_exploratory_markers(files)
         write.csv(backbone_definition,file=file.path(path_to_output,"backbone_selection_file.csv"),row.names=FALSE)
@@ -275,5 +282,4 @@ initialize <- function(
         )
     )
 }
-
 utils::globalVariables(c("type"))

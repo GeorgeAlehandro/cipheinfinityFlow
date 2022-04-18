@@ -21,6 +21,10 @@ subsample_data <- function(
         message("\tDownsampling to ",input_events_downsampling," events per input file")
     }
     files <- list.files(paths["input"],full.names=TRUE,recursive=TRUE,pattern=".fcs")
+    if (!is.na(paths["input1"])){
+
+        files <- list.files(c(paths["input1"],paths["input2"],paths["input3"]),full.names=TRUE,recursive=TRUE,pattern=".fcs")
+    }
     invisible(
         lapply(
             files,
