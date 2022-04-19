@@ -37,7 +37,7 @@ export_data <- function(
     if(verbose){
         message("Exporting results")
     }
-
+    print(a)
     a <- setNames(as.character(a[,"target",]),a[,"file"])
     print(a)
     if(verbose){
