@@ -1,11 +1,10 @@
-Package: cipheinfinityFlow
-Title: R package used to analyze Massively Parallel Flow cytometry data
-Version: 0.1.0
+Package: infinityFlow
+Title: Augmenting Massively Parallel Cytometry Experiments Using Multivariate Non-Linear Regressions
+Version: 1.3.1
 Authors@R: c(
-               person("Etienne","Becht",middle=NULL,email="etienne.becht@protonmail.com",role=c("cre","aut")),
-               person("George Alehandro","Saad",middle=NULL,email="george-alehandro.saad@etu.univ-amu.fr",role=c("ctb"))
+               person("Etienne","Becht",middle=NULL,email="etienne.becht@protonmail.com",role=c("cre","aut"))
 	   )
-Description: R package forked from https://github.com/ebecht/infinityFlow with some modifications in order to fit the data structure of MPC assays at Ciphe Lab - Marseile.
+Description: Pipeline to analyze and merge data files produced by BioLegend's LEGENDScreen or BD Human Cell Surface Marker Screening Panel (BD Lyoplates).
 Depends:
 	R (>= 4.0.0),
 	flowCore

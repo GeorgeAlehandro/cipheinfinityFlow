@@ -45,13 +45,16 @@ correct_background <- function(
     a <- read.csv(paths["annotation"],sep=",",header=TRUE,stringsAsFactors=FALSE)
     rownames(a) <- a[,"file"]
     a <- a[intersect(rownames(a),colnames(preds[[1]])),]
+    
     preds_raw <- preds
+    
     preds_rawbgc <- lapply(
         preds_raw,
         function(x){
             x[,a$file]
         }
     )
+    
     for(i in seq_along(preds_rawbgc)){
         for(file in colnames(preds_rawbgc[[i]])){
             iso <- a[file,"isotype"][1]
@@ -66,7 +69,7 @@ correct_background <- function(
     }
 
     saveRDS(preds_rawbgc,file=file.path(paths["rds"],"predictions_backgroundcorrected.Rds"))
-
+    
     ## ##################
     ## Exporting Phenograph / BGC / UMAPs
     ## ##################
@@ -82,7 +85,7 @@ correct_background <- function(
             })
         }
     )
-
+    
     ## Adding uncorrected data (isotypes and autofluorescence)
     ## I don't think this does anything anymore
     for(i in seq_along(preds_rawbgc_linear)){
@@ -95,7 +98,7 @@ correct_background <- function(
             preds_raw[[i]][,setdiff(colnames(preds[[i]]),c(colnames(preds_rawbgc[[i]]),chans)),drop=FALSE]
         )
     }
-
+    
     preds_rawbgc_linear <- lapply(
         preds_rawbgc_linear,
         function(x){
@@ -120,10 +123,10 @@ correct_background <- function(
 
     preds_rawbgc <- preds_rawbgc[,sort(colnames(preds_rawbgc))]
     preds_rawbgc_linear <- preds_rawbgc_linear[,sort(colnames(preds_rawbgc_linear))]
-
+    
     preds_rawbgc_linear <- cbind(xp[sampling,],preds_rawbgc_linear,minmax_scale(umap))
     preds_rawbgc <- cbind(xp_scaled[sampling,],preds_rawbgc,minmax_scale(umap))
-
+    
     unique_pes <- unique(events.code)
     PE_id <- vapply(events.code[sampling],match,table=unique_pes, FUN.VALUE = 1L)
 
@@ -155,7 +158,7 @@ correct_background <- function(
             function(x){
                 invisible(write.FCS(FCS_list[[x]],filename=file.path(paths["output"],"FCS_background_corrected/","split",paste0(sub(".fcs","",x),"_target_",gsub("/","-",a[x,"target"]),".fcs"))))
             }
-        )
+        )   
     }
 
     if("concatenated" %in% FCS_export){
