@@ -23,7 +23,7 @@
 
 infinity_flow <- function(
                        ## Input FCS files
-                       path_to_fcs, ## Where the source FCS files are
+                       vector_of_file_absolute_paths, ## Name of files and location
                        path_to_output, ## Where the results will be stored
                        path_to_intermediary_results=tempdir(), ## Storing intermediary results. Default to a temporary directory. Can be a user-specified directory to store intermediary results (to resume interrupted computation)
                        backbone_selection_file=NULL, ## Define backbone and exploratory channels. If missing will be defined interactively and the selection will be saved in the output folder under the name backbone_selection_file.csv. To define it the first time you should call select_backbone_and_exploratory_markers(read.files(path_to_fcs,recursive=TRUE)) in an interactive R session
@@ -51,13 +51,14 @@ infinity_flow <- function(
                        extra_args_regression_params=list(
                            list(nrounds=500, eta = 0.05)
                        ),
-                       extra_args_UMAP=list(n_neighbors=15L,min_dist=0.2,metric="euclidean",verbose=verbose,n_epochs=1000L,n_threads=cores,n_sgd_threads=cores),
+                       extra_args_UMAP=list(n_neighbors=15L,min_dist=0.2,metric="euclidean",verbose=verbose,n_epochs=1000L,n_threads=as.integer(cores),n_sgd_threads=as.integer(cores)),
                        extra_args_export=list(FCS_export=c("split","concatenated","none")[1],CSV_export=FALSE),
                        extra_args_correct_background=list(FCS_export=c("split","concatenated","none")[1],CSV_export=FALSE),
                        extra_args_plotting=list(chop_quantiles=0.005),
                        neural_networks_seed = NULL ## Set to integer value to enforce computational reproducibility when using neural networks
                        ){
-
+    ## Added
+  vector_of_file_absolute_paths <- c(vector_of_file_absolute_paths)
     ## Making sure that optional dependencies are installed if used.
     lapply(
         regression_functions,
@@ -76,7 +77,7 @@ infinity_flow <- function(
     ##/!\ Potentially add a check here to make sure parameters are consistent with FCS files
 
     settings <- initialize(
-        path_to_fcs=path_to_fcs,
+      vector_of_file_absolute_paths = vector_of_file_absolute_paths,
         path_to_output=path_to_output,
         path_to_intermediary_results=path_to_intermediary_results,
         backbone_selection_file=backbone_selection_file,
@@ -94,6 +95,7 @@ infinity_flow <- function(
     ## set.seed(your_random_seed)
     subsample_data(
         input_events_downsampling=input_events_downsampling,
+        vector_of_file_absolute_paths = vector_of_file_absolute_paths,
         paths=paths,
         extra_args_read_FCS=extra_args_read_FCS,
         name_of_PE_parameter=name_of_PE_parameter,
@@ -177,7 +179,7 @@ infinity_flow <- function(
 }
 
 initialize <- function(
-                    path_to_fcs=path_to_fcs,
+    vector_of_file_absolute_paths=vector_of_file_absolute_paths,
                     path_to_output=path_to_output,
                     path_to_intermediary_results=path_to_intermediary_results,
                     backbone_selection_file=backbone_selection_file,
@@ -199,6 +201,8 @@ initialize <- function(
         }
         if(verbose){
             message("Using ", tmpdir, " temporary directory to store intermediary results as no non-temporary directory has been specified")
+          message('HERE vector_of_file_absolute_paths')
+          message(vector_of_file_absolute_paths)
         }
     }
 
@@ -209,7 +213,7 @@ initialize <- function(
     path_to_annotation_file <- file.path(path_to_intermediary_results,"annotation.csv") ## Has to be a comma-separated csv file, with two columns. The first column has to be the name of the FCS files and the second the marker bound to the PE reporter. The first line (column names) have to be "file" and "target". You can leave the unlabelled PEs empty
 
     paths <- c(
-        input=path_to_fcs,
+       # input=path_to_fcs,
         intermediary=path_to_intermediary_results,
         subset=path_to_subsetted_fcs,
         rds=path_to_rds,
@@ -230,12 +234,10 @@ initialize <- function(
         message("Using directories...")
         lapply(names(paths),function(x){message("\t",x,": ",paths[x])})
     }
-    files <- list.files(paths["input"],pattern="^.*.(fcs)$",ignore.case=TRUE,recursive=TRUE)
-    # If there are multiple paths
-    if (!is.na(paths["input1"])){
 
-        files <- list.files(c(paths["input1"],paths["input2"],paths["input3"]),full.names=TRUE,recursive=TRUE,pattern=".fcs")
-    }
+
+    files <- as.vector(vector_of_file_absolute_paths)
+
     if(missing(annotation)){
         annotation <- setNames(files,files)
     }
@@ -246,11 +248,12 @@ initialize <- function(
     annotation$target <- make.unique(as.character(annotation$target))
     write.csv(annotation,row.names=FALSE,file=paths["annotation"])
     #####################################################################################################
-    files <- list.files(paths["input"],pattern="^.*.(fcs)$",ignore.case=TRUE,recursive=TRUE)
-    if (!is.na(paths["input1"])){
+    #files <- list.files(paths["input"],pattern="^.*.(fcs)$",ignore.case=TRUE,recursive=TRUE)
+    #if (!is.na(paths["input1"])){
 
-        files <- list.files(c(paths["input1"],paths["input2"],paths["input3"]),full.names=TRUE,recursive=TRUE,pattern=".fcs")
-    }
+   #     files <- list.files(c(paths["input1"],paths["input2"],paths["input3"]),full.names=TRUE,recursive=TRUE,pattern=".fcs")
+  #  }
+    files <- as.vector(vector_of_file_absolute_paths)
     if(missing(backbone_selection_file)){
         backbone_definition <- select_backbone_and_exploratory_markers(files)
         write.csv(backbone_definition,file=file.path(path_to_output,"backbone_selection_file.csv"),row.names=FALSE)
@@ -274,7 +277,7 @@ initialize <- function(
     names(regression_functions) <- make.unique(names(regression_functions))
 
     return(
-        list(
+        list(files = files,
             paths=paths,
             chans=chans,
             name_of_PE_parameter=name_of_PE_parameter,

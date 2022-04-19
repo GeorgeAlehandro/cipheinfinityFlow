@@ -10,6 +10,7 @@
 #' @importFrom Biobase pData exprs
 subsample_data <- function(
                         input_events_downsampling,
+                        vector_of_file_absolute_paths,
                         paths,
                         extra_args_read_FCS,
                         name_of_PE_parameter,
@@ -20,11 +21,7 @@ subsample_data <- function(
         message("Parsing and subsampling input data")
         message("\tDownsampling to ",input_events_downsampling," events per input file")
     }
-    files <- list.files(paths["input"],full.names=TRUE,recursive=TRUE,pattern=".fcs")
-    if (!is.na(paths["input1"])){
-
-        files <- list.files(c(paths["input1"],paths["input2"],paths["input3"]),full.names=TRUE,recursive=TRUE,pattern=".fcs")
-    }
+  files <- vector_of_file_absolute_paths
     invisible(
         lapply(
             files,
@@ -60,7 +57,6 @@ subsample_data <- function(
     names(xp) <- files
     ns <- vapply(xp, nrow, 1L)
     xp <- do.call(rbind,xp)
-
     ## Map which events originate from which file.
     if(verbose){
         message("\tWriting to disk")

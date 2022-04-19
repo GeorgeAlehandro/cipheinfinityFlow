@@ -1,0 +1,775 @@
+##### shiny package #####
+library(dplyr)
+library(cipheinfinityFlow)
+options(shiny.maxRequestSize = 100000*1024^2)
+
+server <- function(session, input, output) {
+#### MODIFIED FUNCTIONS 
+  select_modify <- function(files){
+    requireNamespace("flowCore")
+    representative_file <- read.FCS(files[1],truncate_max_range=FALSE,ignore.text.offset=TRUE)
+    data_channels <- pData(parameters(representative_file)[,c("name","desc")])
+    choices <- c("backbone","exploratory","discard")
+    result <- data.frame(data_channels, factor = factor(NA, levels = c('backbone','exploratory','discard'), 
+                                                        ordered = TRUE))
+    colnames(result) <- (c('name','desc','type'))
+    return(result)
+    
+  }
+##### HIDE TABS
+  #hideTab("antibody_selection", "background_exploratory_selection")
+  #hideTab("antibody_selection", "infinity_markers_selection")
+##### PATH TO
+  ## PATHS TO PRESET
+  infinity_legendscreen_plate1_path_to <- "S:\\Mcyto\\Experiments\\R&D\\2022\\George-Alehandro_InfinityFlow\\markers_panel_presets\\infinity_isotypes_LEGENDSCREEN_plate_1.txt"
+  infinity_legendscreen_plate2_path_to <- "S:\\Mcyto\\Experiments\\R&D\\2022\\George-Alehandro_InfinityFlow\\markers_panel_presets\\infinity_isotypes_LEGENDSCREEN_plate_2.txt"
+  infinity_legendscreen_plate3_path_to <- "S:\\Mcyto\\Experiments\\R&D\\2022\\George-Alehandro_InfinityFlow\\markers_panel_presets\\infinity_isotypes_LEGENDSCREEN_plate_3.txt"
+  ## PATH TO OUTPUT
+  path_to_output<-"S:\\Mcyto\\Experiments\\R&D\\2022\\George-Alehandro_InfinityFlow\\shiny_test_infinity_flow\\"
+  
+  ##PATH TO BACKBONE SPECIFICATION
+  path_to_backbone_specification <- "S:\\Mcyto\\Experiments\\R&D\\2022\\George-Alehandro_InfinityFlow\\markers_panel_presets\\test_annotation_11_4.csv"
+  
+  ##PATH TO INTERMEDIARY FOLDER TO MERGE MULTIPLE FILES
+  path_to_merge<-"S:\\Mcyto\\Experiments\\R&D\\2022\\George-Alehandro_InfinityFlow\\shiny_test_infinity_flow\\Merged_fcs\\"
+  
+  ##PATH TO SCRIPT
+  path_to_script <- "C:\\Users\\gsaad\\Desktop\\CipheInfinity\\www\\"
+  # Cleaning the www file of the script by deleting all the files there
+  do.call(file.remove, list(list.files(path_to_script, full.names = TRUE)))
+##### GLOBAL #####################################
+
+  values <- reactiveValues(
+    backbone_specification=NULL,
+    number_files_1 = NULL,
+    number_files_2 = NULL,
+    number_files_3 = NULL,
+    infinity_markers_specification_1_1 = NULL,
+    infinity_markers_specification_2_1 = NULL,
+    infinity_markers_specification_2_2 = NULL,
+    infinity_markers_specification_3_1 = NULL,
+    infinity_markers_specification_3_2 = NULL,
+    infinity_markers_specification_3_3 = NULL,
+    infinity_markers_specification_all_wells = NULL,
+    flow.frames = NULL,
+    flowAI = NULL,
+    flowClean = NULL,
+    file_selected = NULL,
+    average_number_events = NULL,
+    plate_selected_1_1 = NULL,
+    plate_selected_2_1 = NULL,
+    plate_selected_2_2 = NULL,
+    plate_selected_3_1 = NULL,
+    plate_selected_3_2 = NULL,
+    plate_selected_3_3 = NULL,
+    data = NULL,
+    names.files = c(),
+    means.list = c(),
+    params = list(),
+    params.table = c(),
+    template = NULL,
+    clustering.groups = c(),
+    check.names = FALSE,
+    clustering = NULL,
+    centres = list(),
+    csv = list(),
+    mfi.table = NULL,
+    create.table = NULL,
+    pca.reduc = list(),
+    umap.reduc = NULL,
+    sampling = list(),
+    density = NULL,
+    names.csv = NULL,
+    res1.onesense = NULL,
+    list.plot.output = NULL,
+    manu.annot = NULL,
+    path.big.file = NULL,
+    ref.flow.frames = NULL,
+    ref.table  = NULL,
+    step.ff = list(),
+    step.gates = list(),
+    polygon.temp = NULL,
+    gate.strat = NULL,
+    log = matrix(nrow = 1,ncol = 1,data = "Upload", dimnames = list(NULL,"Log")),
+    package.table = NULL
+  )
+  
+  checkDimName <- function(dim,fcs,button_id){
+    output$dimName <- renderUI({
+      objectDimName <- lapply(c(1:length(dim)),function(i){
+        textInput(paste0("dim_",dim[[i]]),"Name of dim",value=dim[[i]])
+      })
+      return(do.call(tagList,objectDimName))
+    })
+    modalDialog(
+      column(6,uiOutput("dimName")),
+      actionButton(button_id,"Enrich")
+    )
+  }
+  ###Disabling buttons on Loading page
+   shinyjs::disable('confirm')
+   shinyjs::disable('confirm_infinity')
+##### DOWNLOAD IN MENUITEM #######################
+
+  output$downloadData <- downloadHandler (
+    filename = function() {
+      paste("data_", Sys.Date(), ".zip", sep="")
+    },
+    content = function(file) {
+      progress <- Progress$new()
+      flow.frames <- values$flow.frames
+      root <- getwd()
+      tmpdir <- tempdir()
+      setwd(tempdir())
+      fs <- c()
+      progress$set(message="Zip files", value=0.5)
+      for(i in c(1:length(flow.frames))){
+        name <- names(values$flow.frames)[i]
+        fcs <- flow.frames[[i]]
+        path <- gsub(".fcs$",".fcs",name)
+        fs <- c(fs, path)
+        fcs <- updateKeywords(fcs)
+        write.FCS(fcs, path)
+      }
+      zip(zipfile=file, files=fs)
+      setwd(root)
+      progress$close()
+    }
+  )
+  output$ex_out <- renderPrint({
+    print(values$log)
+  })
+  
+  output$bigFileUploaded <- reactive({
+    return(object.size(values$flow.frames)/1000000>10)
+  })
+  
+  output$smallFileUploaded <- reactive({
+    return(object.size(values$flow.frames)/1000000<10)
+  })
+  
+  outputOptions(output, "bigFileUploaded", suspendWhenHidden = FALSE)
+  outputOptions(output, "smallFileUploaded", suspendWhenHidden = FALSE)
+  
+  observeEvent(input$bigDDl,{
+
+    if(Sys.info()[1] == "Linux"){
+      progress <- Progress$new()
+      flow.frames <- values$flow.frames
+      root <- getwd()
+      tmpdir <- tempdir()
+      setwd(tempdir())
+      fs <- c()
+      
+      list.files.remove <- list.files(".",pattern=".fcs",recursive = F,full.names=F)
+      for(t in list.files.remove){
+        print(t)
+        file.remove(t)
+      }
+      progress$set(message="Zip files", value=0.5)
+      for(i in c(1:length(flow.frames))){
+        name <- names(values$flow.frames)[i]
+        fcs <- flow.frames[[i]]
+        path <- gsub(".fcs$",".fcs",name)
+        fs <- c(fs, path)
+        fcs <- updateKeywords(fcs)
+        write.FCS(fcs, path)
+      }
+      
+      zip(zipfile="output.zip", files=fs)
+      setwd(root)
+      values$path.big.file <- paste0(tmpdir,"/output.zip")
+      values$path.big.file <- str_replace(values$path.big.file,"/media/data/html","http://10.71.1.22/")
+      progress$close()
+      
+      output$lnkBigDDl <- renderText({
+        return(paste0("<a href='",values$path.big.file,"'>Download</a>"))
+      })
+    }else if(Sys.info()[1]=="Windows"){
+      dir <- chooseDir()
+      dir <- gsub("\\\\","/",dir)
+      progress <- Progress$new()
+      flow.frames <- values$flow.frames
+      fs <- c()
+      for(i in c(1:length(flow.frames))){
+        name <- paste0(dir,"/",names(values$flow.frames)[i])
+        fcs <- flow.frames[[i]]
+        path <- gsub(".fcs$",".fcs",name)
+        fs <- c(fs, path)
+        fcs <- updateKeywords(fcs)
+        write.FCS(fcs, path)
+      }
+      progress$close()
+      showNotification(ui=paste0("Your FCS is write at : ",dir),type="message")
+    }
+  })
+  
+##### UPLOAD FCS PANEL ###########################
+  observe({
+    print("a")
+    if(!is.null(values$flow.frames)){
+      print("d")
+      shinyjs::disable(id = "fcs_input")
+    } else {
+      print("e")
+      shinyjs::enable(id="fcs_input")
+    }
+  })
+  volumes = getVolumes()
+
+#####################################
+  ### For each value selected by the slider, observe a certain event
+  #### Returns the destination  but should be fixed.
+  ### The value should be returned, but also showed as print as a good format
+  # that can also be taken by infinity flow
+  observeEvent(input$number_plates,{
+    if (input$number_plates == '1'){
+      reset()
+      shinyDirChoose(input, 'file_destination_1_1', root = volumes,
+                      filetypes = c('','fcs','csv'))
+      observeEvent(input$file_destination_1_1,{
+        values$plate_selected_1_1<-parseDirPath(volumes, input$file_destination_1_1)
+      output$filechosen_1_1 <- renderText({
+        as.character(values$plate_selected_1_1)
+      })})
+    }
+  })
+  ## values$file_selected sticks
+  observeEvent(input$number_plates,{
+    if (input$number_plates == '2'){
+      reset()
+      shinyDirChoose(input, 'file_destination_2_1', root = volumes,
+                     filetypes = c('', "fcs", "csv"))
+      shinyDirChoose(input, 'file_destination_2_2', root = volumes,
+                     filetypes = c('', "fcs", "csv"))
+
+      observeEvent(input$file_destination_2_1,{
+          values$plate_selected_2_1<-parseDirPath(volumes, input$file_destination_2_1)
+        output$filechosen_2_1 <- renderText({
+          values$plate_selected_2_1
+        })
+        })
+        
+      observeEvent(input$file_destination_2_2,{        
+          values$plate_selected_2_2<-parseDirPath(volumes, input$file_destination_2_2)
+        
+        output$filechosen_2_2 <- renderText({
+          values$plate_selected_2_2
+          })
+        })
+    }
+  })
+  #UI Generation based on the number of input of plates selected by the user
+  observeEvent(input$number_plates,{
+    if (input$number_plates == '3'){
+      reset()
+      shinyDirChoose(input, 'file_destination_3_1', root = volumes,
+                     filetypes = c('', "fcs", "csv"))
+      shinyDirChoose(input, 'file_destination_3_2', root = volumes,
+                     filetypes = c('', "fcs", "csv"))
+      shinyDirChoose(input, 'file_destination_3_3', root = volumes,
+                     filetypes = c('', "fcs", "csv"))
+      
+      observeEvent(input$file_destination_3_1,{        
+        values$plate_selected_3_1<-parseDirPath(volumes, input$file_destination_3_1)
+        
+        output$filechosen_3_1 <- renderText({
+          values$plate_selected_3_1
+        })
+      })
+      observeEvent(input$file_destination_3_2,{
+        values$plate_selected_3_2<-parseDirPath(volumes, input$file_destination_3_2)
+        output$filechosen_3_2 <- renderText({
+          values$plate_selected_3_2
+        })
+      })
+      observeEvent(input$file_destination_3_3,{
+        values$plate_selected_3_3<-parseDirPath(volumes, input$file_destination_3_3)
+        output$filechosen_3_3 <- renderText({
+          values$plate_selected_3_3
+        })
+      })
+    }
+  })
+  ####Function used to reset all the inputs when moving through slider
+  reset <- function(){
+    values$file_selected <- NULL
+  }
+#####################################SUBMIT
+  observeEvent(input$submit,
+               {
+                 if (input$number_plates == '1'){
+                   values$file_selected <- (as.vector(values$plate_selected_1_1))
+                   values$number_files_1 <- length(list.files(values$file_selected, pattern = ".fcs", full.names = TRUE))
+                   print(values$number_files_1)}
+                 if (input$number_plates == '2'){
+    values$file_selected <- (as.vector(c(values$plate_selected_2_1, values$plate_selected_2_2)))
+    values$number_files_1 <- length(list.files(values$plate_selected_2_1, pattern = ".fcs", full.names = TRUE))
+    print(values$number_files_1)
+    values$number_files_2 <- length(list.files(values$plate_selected_2_2, pattern = ".fcs", full.names = TRUE))
+    print(values$number_files_2)
+    }
+                 if (input$number_plates == '3'){
+                   values$file_selected <- (as.vector(c(values$plate_selected_3_1, values$plate_selected_3_2,values$plate_selected_3_3)))
+                                            values$number_files_1 <- length(list.files(values$plate_selected_3_1, pattern = ".fcs", full.names = TRUE))
+                                            print(values$number_files_1)
+                                            values$number_files_2 <- length(list.files(values$plate_selected_3_2, pattern = ".fcs", full.names = TRUE))
+                                            print(values$number_files_2)
+                                            values$number_files_3 <- length(list.files(values$plate_selected_3_3, pattern = ".fcs", full.names = TRUE))
+                                            print(values$number_files_3)
+                                        
+                                            }
+    #Calls the infinityFlow package for background specification
+    values$backbone_specification <- select_modify(list.files(values$file_selected, pattern = ".fcs", full.names = TRUE))
+    print(values$backbone_specification)
+    #Render the table
+    output$selection_table <- renderRHandsontable({
+      rhandsontable(values$backbone_specification, width = 950)})
+     #To delete any previously saved files (analyzed before)
+    do.call(file.remove, list(list.files(path_to_merge, full.names = TRUE)))
+
+    #fcs files selected
+    fcs_files <- list.files(values$file_selected, pattern = ".fcs", full.names = TRUE)
+    
+    #Copy the files in path_to_merge, calculates the sum of events for all the wells
+    #One iteration that does 2 jobs
+    sum_of_all_events <- 0
+    for(file in fcs_files) {
+      file.copy(file, path_to_merge)
+      #Reading the fcs file to have access into the description of total events
+      read_fcs_file <- read.FCS(file)
+      sum_of_all_events <-sum_of_all_events+ as.numeric(read_fcs_file@description[["$TOT"]])
+    }
+    #Calculates the average of events of all the wells
+    values$average_number_events <- sum_of_all_events / length(fcs_files)    
+      print(values$average_number_events)
+    print(sum_of_all_events)
+    ##When all is set and done, enable the buttons
+    showTab("antibody_selection", "background_exploratory_selection")
+    
+    }
+    
+    
+          )
+  observeEvent(input$selection_table,{
+    if(!is.null(input$selection_table)){
+      values$backbone_specification <- as.data.frame(hot_to_r(input$selection_table))
+      output$selection_table <- renderRHandsontable({
+        rhandsontable(values$backbone_specification) } )
+      if(any(is.na(values$backbone_specification[,'type']))){
+        shinyjs::disable('confirm')
+      }
+      
+      if(!any(is.na(values$backbone_specification[,'type']))){
+        shinyjs::enable('confirm')
+      }
+         
+         
+         
+         }})
+########################CONFIRM EXPLORATORY AND BACKGROUND SELECTION
+  ## Checks if there are NA values --> throws an error if value is NA
+  ## Then if all the values are not NA --> checks if at least one of the data 
+  ## acquisition is 'exploratory'
+  observeEvent(input$confirm,
+               {
+                if(any(is.na(values$backbone_specification[,'type']))){
+                  showNotification("One or more type values are empty inside the table.", type = 'error')
+                  
+                }
+                 else{
+                 if(!any(values$backbone_specification[,'type']=="exploratory")){
+                   showNotification("At least one measurement must be exploratory.", type = 'error')
+                 }
+                 }
+                 path_to_backbone_specification <- "S:\\Mcyto\\Experiments\\R&D\\2022\\George-Alehandro_InfinityFlow\\markers_panel_presets\\test_annotation_11_4.csv"
+                 write.csv(values$backbone_specification, file = "S:\\Mcyto\\Experiments\\R&D\\2022\\George-Alehandro_InfinityFlow\\markers_panel_presets\\test_annotation_11_4.csv", 
+                           row.names = FALSE)
+                 showTab("antibody_selection", "infinity_markers_selection")
+                 }
+                 )
+######################### ADRESSING THE INFINITY MARKERS TABLE
+  observeEvent(input$infinity_markers_1_1,
+               {
+                 values$infinity_markers_specification_1_1 <- read.csv(input$infinity_markers_1_1$datapath, sep ="\t")
+                 # -> dataframe
+                 output$infinity_markers_table_1_1 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_1_1, width = 950, height = 400)})
+                 #Render the datatable of background and exploratory specification
+                 ##LOADED
+                 shinyjs::enable('confirm_infinity')
+
+               }
+  )
+  observeEvent(input$infinity_markers_table_1_1,{
+    values$infinity_markers_specification_1_1 <- as.data.frame(hot_to_r(input$infinity_markers_table_1_1))
+    print(head(values$infinity_markers_specification_1_1))
+  })
+
+  observeEvent(input$infinity_markers_preset_1_1,
+               {
+                 if (input$infinity_markers_preset_1_1 == "infinity_isotypes_LEGENDSCREEN_plate_1"){
+                   values$infinity_markers_specification_1_1 <- read.csv(infinity_legendscreen_plate1_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_1_1 == "infinity_isotypes_LEGENDSCREEN_plate_2"){
+                   values$infinity_markers_specification_1_1 <- read.csv(infinity_legendscreen_plate2_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_1_1 == "infinity_isotypes_LEGENDSCREEN_plate_3"){
+                   values$infinity_markers_specification_1_1 <- read.csv(infinity_legendscreen_plate3_path_to, sep ="\t")
+
+
+                 }
+                 output$infinity_markers_table_1_1 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_1_1, width = 950, height = 400)})
+                 shinyjs::enable('confirm_infinity')
+
+               }
+  )
+
+#################### 2 PLATES, FIRST PLATE  
+  
+  observeEvent(input$infinity_markers_2_1,
+               {
+                 values$infinity_markers_specification_2_1 <- read.csv(input$infinity_markers_2_1$datapath, sep ="\t")
+                 # -> dataframe
+                 output$infinity_markers_table_2_1 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_2_1, width = 950, height = 400)})
+                 #Render the datatable of background and exploratory specification
+                 ##LOADED
+                 shinyjs::enable('confirm_infinity')
+                 
+               }
+  )
+  observeEvent(input$infinity_markers_table_2_1,{
+    values$infinity_markers_specification_2_1 <- as.data.frame(hot_to_r(input$infinity_markers_table_2_1))
+  })
+
+  observeEvent(input$infinity_markers_preset_2_1,
+               {
+                 if (input$infinity_markers_preset_2_1 == "infinity_isotypes_LEGENDSCREEN_plate_1"){
+                   values$infinity_markers_specification_2_1 <- read.csv(infinity_legendscreen_plate1_path_to, sep ="\t")
+                 }
+                 if (input$infinity_markers_preset_2_1 == "infinity_isotypes_LEGENDSCREEN_plate_2"){
+                   values$infinity_markers_specification_2_1 <- read.csv(infinity_legendscreen_plate2_path_to, sep ="\t")
+                 }
+                 if (input$infinity_markers_preset_2_1 == "infinity_isotypes_LEGENDSCREEN_plate_3"){
+                   values$infinity_markers_specification_2_1 <- read.csv(infinity_legendscreen_plate3_path_to, sep ="\t")
+
+                 }
+                 output$infinity_markers_table_2_1 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_2_1, width = 950, height = 400)})
+                 shinyjs::enable('confirm_infinity')
+                 
+               }
+  )
+  #################### 2 PLATES, SECOND PLATE  
+  
+  observeEvent(input$infinity_markers_2_2,
+               {
+                 values$infinity_markers_specification_2_2 <- read.csv(input$infinity_markers_2_2$datapath, sep ="\t")
+                 output$infinity_markers_table_2_2 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_2_2, width = 950, height = 400)})
+
+               }
+  )
+  observeEvent(input$infinity_markers_table_2_2,{
+    values$infinity_markers_specification_2_2 <- as.data.frame(hot_to_r(input$infinity_markers_table_2_2))
+  })
+  
+  observeEvent(input$infinity_markers_preset_2_2,
+               {
+                 if (input$infinity_markers_preset_2_2 == "infinity_isotypes_LEGENDSCREEN_plate_1"){
+                   values$infinity_markers_specification_2_2 <- read.csv(infinity_legendscreen_plate1_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_2_2 == "infinity_isotypes_LEGENDSCREEN_plate_2"){
+                   values$infinity_markers_specification_2_2 <- read.csv(infinity_legendscreen_plate2_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_2_2 == "infinity_isotypes_LEGENDSCREEN_plate_3"){
+                   values$infinity_markers_specification_2_2 <- read.csv(infinity_legendscreen_plate3_path_to, sep ="\t")
+
+                 }
+                 output$infinity_markers_table_2_2 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_2_2, width = 950, height = 400)})
+                 
+               }
+  )
+  #################### 3 PLATES, FIRST PLATE  
+  
+  observeEvent(input$infinity_markers_3_1,
+               {
+                 values$infinity_markers_specification_3_1 <- read.csv(input$infinity_markers_3_1$datapath, sep ="\t")
+                 output$infinity_markers_table_3_1 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_3_1, width = 250, height = 400)})
+                 shinyjs::enable('confirm_infinity')
+               }
+  )
+  observeEvent(input$infinity_markers_table_3_1,{
+    values$infinity_markers_specification_3_1 <- as.data.frame(hot_to_r(input$infinity_markers_table_3_1))
+  })
+  
+  observeEvent(input$infinity_markers_preset_3_1,
+               {
+                 if (input$infinity_markers_preset_3_1 == "infinity_isotypes_LEGENDSCREEN_plate_1"){
+                   values$infinity_markers_specification_3_1 <- read.csv(infinity_legendscreen_plate1_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_3_1 == "infinity_isotypes_LEGENDSCREEN_plate_2"){
+                   values$infinity_markers_specification_3_1 <- read.csv(infinity_legendscreen_plate2_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_3_1 == "infinity_isotypes_LEGENDSCREEN_plate_3"){
+                   values$infinity_markers_specification_3_1 <- read.csv(infinity_legendscreen_plate3_path_to, sep ="\t")
+
+                 }
+                 output$infinity_markers_table_3_1 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_3_1, width = 250, height = 400)})
+                 shinyjs::enable('confirm_infinity')
+                 
+               }
+  )
+  #################### 3 PLATES, SECOND PLATE  
+  
+  observeEvent(input$infinity_markers_3_2,
+               {
+                 values$infinity_markers_specification_3_2 <- read.csv(input$infinity_markers_3_2$datapath, sep ="\t")
+
+                 
+               }
+  )
+  observeEvent(input$infinity_markers_table_3_2,{
+    values$infinity_markers_specification_3_2 <- as.data.frame(hot_to_r(input$infinity_markers_table_3_2))
+  })
+  
+  observeEvent(input$infinity_markers_preset_3_2,
+               {
+                 if (input$infinity_markers_preset_3_2 == "infinity_isotypes_LEGENDSCREEN_plate_1"){
+                   values$infinity_markers_specification_3_2 <- read.csv(infinity_legendscreen_plate1_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_3_2 == "infinity_isotypes_LEGENDSCREEN_plate_2"){
+                   values$infinity_markers_specification_3_2 <- read.csv(infinity_legendscreen_plate2_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_3_2 == "infinity_isotypes_LEGENDSCREEN_plate_3"){
+                   values$infinity_markers_specification_3_2 <- read.csv(infinity_legendscreen_plate3_path_to, sep ="\t")
+
+                 }
+                 output$infinity_markers_table_3_2 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_3_2, width = 250, height = 400)})
+                 
+               }
+  )
+  
+  #################### 3 PLATES, THIRD PLATE  
+  
+  observeEvent(input$infinity_markers_3_3,
+               {
+                 values$infinity_markers_specification_3_3 <- read.csv(input$infinity_markers_3_3$datapath, sep ="\t")
+                 output$infinity_markers_table_3_3 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_3_3, width = 250, height = 400)})
+                 
+               }
+  )
+  observeEvent(input$infinity_markers_table_3_3,{
+    values$infinity_markers_specification_3_3 <- as.data.frame(hot_to_r(input$infinity_markers_table_3_3))
+  })
+  
+  observeEvent(input$infinity_markers_preset_3_3,
+               {
+                 if (input$infinity_markers_preset_3_3 == "infinity_isotypes_LEGENDSCREEN_plate_1"){
+                   values$infinity_markers_specification_3_3 <- read.csv(infinity_legendscreen_plate1_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_3_2 == "infinity_isotypes_LEGENDSCREEN_plate_2"){
+                   values$infinity_markers_specification_3_3 <- read.csv(infinity_legendscreen_plate2_path_to, sep ="\t")
+
+                 }
+                 if (input$infinity_markers_preset_3_3 == "infinity_isotypes_LEGENDSCREEN_plate_3"){
+                   values$infinity_markers_specification_3_3 <- read.csv(infinity_legendscreen_plate3_path_to, sep ="\t")
+
+                 }
+                 output$infinity_markers_table_3_3 <- renderRHandsontable({
+                   rhandsontable(values$infinity_markers_specification_3_3, width = 250, height = 400)})
+                 
+                 
+               }
+  )
+  
+  #Functionality of the Confirm Infinity Markers button, that takes the dataframe
+  #made by the different antibodies in order to infer each exploratory antibody to each fcs file
+  #Resulting value is stored within the reactive value of values$infinity_markers_specification_all_wells
+  observeEvent(input$confirm_infinity,
+               { if (input$number_plates == '1' && !is.null(values$infinity_markers_specification_1_1)){
+                 values$infinity_markers_specification_all_wells <- values$infinity_markers_specification_1_1
+               }
+                 if (input$number_plates == '2' && !is.null(values$infinity_markers_specification_2_1)&& !is.null(values$infinity_markers_specification_2_2)){
+                   values$infinity_markers_specification_all_wells <- rbind(values$infinity_markers_specification_2_1,values$infinity_markers_specification_2_2)
+                 }
+                 if (input$number_plates == '3' && !is.null(values$infinity_markers_specification_3_1)&& !is.null(values$infinity_markers_specification_3_2)&& !is.null(values$infinity_markers_specification_3_3)){
+                   values$infinity_markers_specification_all_wells <- rbind(values$infinity_markers_specification_3_1,values$infinity_markers_specification_3_2,values$infinity_markers_specification_3_3)
+                   
+                 }
+                 row.names(values$infinity_markers_specification_all_wells) = list.files(values$file_selected, pattern = "\\.fcs$")
+
+                 
+                 
+               }
+  )
+  
+  #Function to create an empty dataframe with number of rows equal to the number of files
+  create_empty_df <- function(number_of_rows){
+    df <- data.frame(matrix(NA, nrow = number_of_rows, ncol = 2))
+    
+    colnames(df)<-c('Infinity_target', 'Infinity_isotype')
+    df$Infinity_target <- as.character(df$Infinity_target)
+    df$Infinity_isotype <- as.character(df$Infinity_isotype)
+    return(df)
+    
+  }
+ #Initialized customized table button behavior
+  observeEvent(input$initialize_empty,
+               {
+                 if (input$number_plates == '1'){
+                  empty_table_1 <- create_empty_df(values$number_files_1)
+                   output$infinity_markers_table_1_1 <- renderRHandsontable({
+                     rhandsontable(empty_table_1, width = 950, height = 400)})
+                   
+                 }
+                 if (input$number_plates == '2'){
+                   empty_table_1 <- create_empty_df(values$number_files_1)
+                   empty_table_2 <- create_empty_df(values$number_files_2)
+                   output$infinity_markers_table_2_1 <- renderRHandsontable({
+                     rhandsontable(empty_table_1, width = 950, height = 400)})
+                   output$infinity_markers_table_2_2 <- renderRHandsontable({
+                     rhandsontable(empty_table_2, width = 950, height = 400)})
+                   
+                 }
+                 if (input$number_plates == '3'){
+                   empty_table_1 <- create_empty_df(values$number_files_1)
+                   empty_table_2 <- create_empty_df(values$number_files_2)
+                   empty_table_3 <- create_empty_df(values$number_files_3)
+                   output$infinity_markers_table_3_1 <- renderRHandsontable({
+                     rhandsontable(empty_table_1, width = 250, height = 400)})
+                   output$infinity_markers_table_3_2 <- renderRHandsontable({
+                     rhandsontable(empty_table_2, width = 250, height = 400)})
+                   output$infinity_markers_table_3_3 <- renderRHandsontable({
+                     rhandsontable(empty_table_3, width = 250, height = 400)})
+                   
+                 }
+               }
+  )
+  
+######################### Begin pipeline
+  observeEvent(input$begin_pipeline, {
+    #Fetching the value of specified sliders 
+    input_events_downsampling <- (input$input_events_downsampling/100) * values$average_number_events
+    prediction_events_downsampling <- (input$prediction_events_downsampling/100) * values$average_number_events
+    print(input_events_downsampling)
+    print(prediction_events_downsampling)
+    print(input$cores_used)
+    cores <- input$cores_used
+    
+    targets <- values$infinity_markers_specification_all_wells$Infinity_target
+    names(targets) <- rownames(values$infinity_markers_specification_all_wells)
+    isotypes <- values$infinity_markers_specification_all_wells$Infinity_isotype
+    names(isotypes) <- rownames(values$infinity_markers_specification_all_wells)
+    
+    
+    ####Real beginning of the pipeline
+    
+    print('HERE ARGUMENTS infinity_flow')
+    print(values$file_selected)
+    print(path_to_output)
+    print(path_to_backbone_specification)
+    print(targets)
+    print(isotypes)
+    #to_concatenate <- c(input$cores_used, 'L')
+   # cores <- paste(to_concatenate, collapse = '')
+    cores <- as.numeric(input$cores_used)
+    print((cores))
+    
+    ###Now commented for looking other things
+    imputed_data <- infinity_flow(
+      path_to_fcs = path_to_merge,
+      path_to_output = path_to_output,
+   #   path_to_intermediary_results = path_to_intermediary_results,
+      backbone_selection_file = path_to_backbone_specification,
+      annotation = targets,
+      isotype = isotypes,
+      input_events_downsampling = input_events_downsampling,
+      prediction_events_downsampling = prediction_events_downsampling,
+      verbose = TRUE,
+      cores = cores
+    )
+    # Copying the pdf files into www source folder to later be displayed in tab
+    pdf_files <- list.files(path_to_output, pattern = ".pdf", full.names = TRUE, recursive = TRUE)
+    # Cleaning the www file of the script by deleting all the files there
+    do.call(file.remove, list(list.files(path_to_script, full.names = TRUE)))
+    print('ALL PDF FILES HERE')
+    print(pdf_files)
+    for (file in pdf_files){
+      
+      file.copy(file, path_to_script)
+      print(file)
+      print('DONE')
+    }
+  })
+####VIEWING PDF
+  #UMAP not background corrected
+  observeEvent(input$generate_umap, {
+    print('loading done')
+  output$plot_umap <- 
+    renderUI({
+    tags$iframe(style="height:1000px; width:260%", src="umap_plot_annotated.pdf")
+  })
+  })
+  #UMAP background corrected
+  observeEvent(input$generate_umap_corrected, {
+    print('loading done')
+    output$plot_umap_corrected <- 
+      renderUI({
+        tags$iframe(style="height:1000px; width:260%", src="umap_plot_annotated_backgroundcorrected.pdf")
+      })
+  })
+#########################
+  observeEvent(input$refresh_input,{
+    print("refresh")
+    values$flow.frames = NULL
+    values$flowAI = NULL
+    values$flowClean = NULL
+    values$names.files = c()
+    values$means.list = c()
+    values$params = list()
+    values$params.table = c()
+    values$template = NULL
+    values$clustering.groups = c()
+    values$check.names = FALSE
+    values$clustering = NULL
+    values$centres = list()
+    values$csv = list()
+    values$mfi.table = NULL
+    values$create.table = NULL
+    values$pca.reduc = list()
+    values$umap.reduc = NULL
+    values$sampling = list()
+    values$density = NULL
+    values$names.csv = NULL
+    values$res1.onesense = NULL
+    values$list.plot.output = NULL
+    values$manu.annot = NULL
+    values$path.big.file = NULL
+    values$ref.flow.frames = NULL
+    values$ref.table  = NULL
+    values$step.ff = list()
+    values$step.gates = list()
+    values$polygon.temp = NULL
+    values$gate.strat = NULL
+    values$log = matrix(nrow = 1,ncol = 1,data = "Upload", dimnames = list(NULL,"Log"))
+    values$package.table = NULL
+    showNotification("all_refresh input done", type = "message")
+  })
+}

@@ -67,7 +67,7 @@ fitter_linear <- function(x = NULL, params = NULL){
 
 #' Wrapper to glmnet. Defined separetely to avoid passing too many objects in parLapplyLB
 #' @param x passed from fit_regressions
-#' @param params passed from fit_regressions 
+#' @param params passed from fit_regressions
 #' @importFrom stats as.formula predict
 #' @importFrom utils getS3method
 #' @export
@@ -91,14 +91,14 @@ fitter_glmnet <- function(x = NULL, params = NULL){
                 use.model.frame = TRUE
             )
         )
-        
+
         fun <- getS3method("cv.glmnet", "formula", envir = asNamespace("glmnetUtils"))
         model <- do.call(fun, params)
         model$call <- NULL ## Slimming down object
         model$glmnet.fit$call <- NULL ## Slimming down object
         attributes(model$terms)[[".Environment"]] <- NULL ## Slimming down object
         pred <- predict(model, as.data.frame(x[, chans]), s = model$lambda.min)
-        
+
         rm(list = setdiff(ls(), c("pred", "model")))
         return(list(pred = pred, model = model))
     }
@@ -156,14 +156,14 @@ fitter_nn <- function(x,params){
     if(!requireNamespace("tensorflow", quietly = TRUE) & !requireNamespace("keras", quietly = TRUE)){
         stop("Please run install.packages(c(\"tensorflow\", \"keras\")) and make sure that install_tensorflow() and install_keras() have been run")
     }
-    
+
     if(!is.null(x) & !is.null(params)){
         model <- keras::unserialize_model(params$object)
         params <- params[setdiff(names(params),"object")]
 
         early_stop <- keras::callback_early_stopping(monitor = "val_loss", patience = 20)
         callbacks <- list(early_stop)
-        
+
         w <- x[,"train_set"]==1
 
         fit_history <- do.call(
@@ -178,7 +178,7 @@ fitter_nn <- function(x,params){
             },
             params
         )
-        
+
         pred <- predict(model, x[, chans])
         rm(list=setdiff(ls(),c("pred","model","fit_history")))
         return(list(pred = pred, model = keras::serialize_model(model), fit_history = fit_history))
@@ -215,7 +215,7 @@ fit_regressions <- function(
                          verbose=TRUE,
                          neural_networks_seed
                          )
-{   
+{
     if(verbose){
         message("Fitting regression models")
     }
@@ -223,24 +223,20 @@ fit_regressions <- function(
     chans <- make.names(chans)
     yvar <- make.names(yvar)
     colnames(xp) <- make.names(colnames(xp))
-    
     requireNamespace("parallel")
-    
+    cores <- as.integer(cores)
     cl <- makeCluster(min(cores,length(unique(events.code))))
-    
     RNGkind("L'Ecuyer-CMRG")
-
     if(.Platform$OS.type == "windows") {
         mc.reset.stream <- function() return(invisible(NULL))
     } else {
         mc.reset.stream <- parallel::mc.reset.stream
     }
-    
     mc.reset.stream()
 
     env <- environment()
-    
-    
+
+
     if(verbose){
         message("\tRandomly selecting 50% of the subsetted input files to fit models")
     }
@@ -267,7 +263,7 @@ fit_regressions <- function(
             )
         )
     )
-    
+
     clusterExport(
         cl,
         c("yvar","chans","neural_networks_seed", "regression_functions", "fitter_nn"),
@@ -296,14 +292,14 @@ fit_regressions <- function(
             ## }
         }
     )
-    
+
     if(verbose){
         message("\tFitting...")
     }
 
     models <- list()
     timings <- numeric()
-    
+
     for(i in seq_along(regression_functions)){
         cat("\t\t",names(regression_functions)[i],"\n\n",sep="")
         t0 <- Sys.time()
@@ -354,7 +350,7 @@ predict_from_models <- function(
                              verbose=TRUE,
                              neural_networks_seed
                              )
-{   
+{
     if(verbose){
         message("Imputing missing measurements")
     }
@@ -363,17 +359,18 @@ predict_from_models <- function(
     chans <- make.names(chans)
     colnames(xp) <- make.names(colnames(xp))
     xp <- xp[, chans]
-    
+
     requireNamespace("parallel")
+    cores <- as.integer(cores)
     cl <- makeCluster(cores)
-    
+
     if(.Platform$OS.type == "windows") {
         mc.reset.stream <- function() return(invisible(NULL))
     } else {
         mc.reset.stream <- parallel::mc.reset.stream
     }
     mc.reset.stream()
-    
+
     env <- environment()
 
     if(verbose){
@@ -392,10 +389,10 @@ predict_from_models <- function(
     )
 
     pred_set <- which(do.call(c,spl))
-    
+
     xp <- xp[pred_set,]
     xp_raw <- xp_raw[pred_set, ]
-    
+
     clusterExport(
         cl,
         c("xp","chans","neural_networks_seed", "regression_functions", "fitter_nn"),
@@ -410,7 +407,7 @@ predict_from_models <- function(
             ##     if(requireNamespace("keras", quietly = TRUE) & requireNamespace("tensorflow", quietly = TRUE)){
             ##         if(!is.null(neural_networks_seed)){
             ##             tensorflow::use_session_with_seed(neural_networks_seed) ## This will make results reproducible, disable GPU and CPU parallelism (which is good actually). Source: https://keras.rstudio.com/articles/faq.html#how-can-i-obtain-reproducible-results-using-keras-during-development
-            ##         }  else {                        
+            ##         }  else {
             ##             tensorflow::tf$reset_default_graph()
             ##             config <- list()
             ##             config$intra_op_parallelism_threads <- 1L
@@ -423,7 +420,7 @@ predict_from_models <- function(
             ## }
         }
     ))
-    
+
     for(i in seq_along(models)){
         models[[i]] <- lapply(models[[i]],"[[",2)
     }
@@ -453,7 +450,7 @@ predict_from_models <- function(
         timings <- c(timings,dt)
         colnames(preds[[i]]) <- names(models[[i]])
     }
-    
+
     stopCluster(cl)
 
     if(verbose){
@@ -467,6 +464,6 @@ predict_from_models <- function(
         message("\tWriting to disk")
     }
     saveRDS(preds,file=file.path(paths["rds"],"predictions.Rds"))
-    saveRDS(pred_set,file=file.path(paths["rds"],"sampling_preds.Rds"))   
+    saveRDS(pred_set,file=file.path(paths["rds"],"sampling_preds.Rds"))
     list(timings=timings)
 }
