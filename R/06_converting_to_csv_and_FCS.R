@@ -37,13 +37,13 @@ export_data <- function(
     if(verbose){
         message("Exporting results")
     }
-    
+
     a <- setNames(as.character(a[,"target",]),a[,"file"])
-    
+    print(a)
     if(verbose){
         message("\tTransforming predictions back to a linear scale")
     }
-
+    print('preds_raw')
     preds_raw <- preds
 
     preds <- lapply(preds,function(x){
@@ -53,37 +53,38 @@ export_data <- function(
         }
         x
     })
-
+    print('preds')
     preds <- lapply(
         names(preds),
         function(x){
             w <- colnames(preds[[x]])[colnames(preds[[x]])%in%names(a)]
             preds[[x]] <- preds[[x]][,w]
-            
+
             colnames(preds[[x]]) <- paste0(a[colnames(preds[[x]])],".",x)
             preds[[x]]
         }
     )
+    print('preds_raw')
     preds_raw <- lapply(
         names(preds_raw),
         function(x){
             w <- colnames(preds_raw[[x]])[colnames(preds_raw[[x]])%in%names(a)]
             preds_raw[[x]] <- preds_raw[[x]][,w]
-            
+
             colnames(preds_raw[[x]]) <- paste0(a[colnames(preds_raw[[x]])],".",x)
             preds_raw[[x]]
         }
     )
-    
+
     prediction_colnames <- sort(do.call(c,lapply(preds,colnames)))
     preds <- do.call(cbind,preds)[,prediction_colnames]
     preds_raw <- do.call(cbind,preds_raw)[,prediction_colnames]
-    
+
     unique_pes <- unique(events.code)
     PE_id <- vapply(events.code[sampling],match,table=unique_pes, FUN.VALUE = 1L)
-    
+
     write.csv(file=file.path(paths["output"],"Exploratory_Ab_ID_table.csv"),data.frame(file=unique_pes,target=a[unique_pes],PE_id=seq_len(length(unique_pes))),row.names=FALSE)
-    
+    print('UMAP')
     ## To make UMAP easier to plot for FlowJo users
     umap <- apply(umap,2,function(x){
         (x-min(x))/(max(x)-min(x))*10000
@@ -91,7 +92,7 @@ export_data <- function(
 
     preds <- cbind(xp[sampling,],preds[,!colnames(preds)%in%colnames(xp)],Exploratory_Ab_ID=PE_id,umap)
     preds_raw <- cbind(xp_scaled[sampling,],preds_raw[,!colnames(preds_raw)%in%colnames(xp_scaled)],Exploratory_Ab_ID=PE_id,umap)
-    
+
     colnames(preds) <- make.unique(colnames(preds))
     colnames(preds_raw) <- make.unique(colnames(preds_raw))
 
@@ -101,7 +102,7 @@ export_data <- function(
         }
         write.csv(preds,file=file.path(paths["output"],"results.csv"),row.names=FALSE)
     }
-    
+
     if("split" %in% FCS_export){
         if(verbose){
             message("\t","Exporting FCS files (1 per well)")
