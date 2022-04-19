@@ -4,7 +4,7 @@
 #' @importFrom Biobase pData
 #' @return A flowframe with description consistent with pData(ff@parameters)
 #' @noRd
-
+#test
 generate_description<-function(ff){
     res <- ff
     res.desc <- pData(res@parameters)
@@ -155,7 +155,7 @@ color_biplot_by_channels <- function(
             x=x,
             y=y
         )
-        
+
         file <- file_name
 
         pdf(file)
@@ -169,7 +169,7 @@ color_biplot_by_channels <- function(
                 par("mar"=c(0,0,0,0))
                 grid.newpage()
                 label <- sub(".png","",sub("mainplot_","",tail(strsplit(x$main.file,"/")[[1]],1),fixed=TRUE),fixed=TRUE)
-                
+
                 if(!global_across_channels){
                     grid.raster(readPNG(x$main.file,native=TRUE),y=0.6,height=0.8)
                     grid.raster(readPNG(x$scale.file,native=TRUE),y=0.1,height=0.2)
@@ -228,7 +228,7 @@ select_backbone_and_exploratory_markers <- function(files){
 
         user_choice <- NA
         print(result)
-        
+
         while(is.na(user_choice)){
             correct <- readline("Is selection correct? (yes/no): ")
             choices <- c("yes","no")
@@ -253,7 +253,7 @@ select_backbone_and_exploratory_markers <- function(files){
 #' @param vector A vector of length nrow(mat) if byrow=TRUE, ncol(mat) if byrow=FALSE
 #' @param byrow if TRUE split rows, if FALSE split columns
 #' @noRd
-split_matrix <- function (mat, vector, byrow = TRUE) 
+split_matrix <- function (mat, vector, byrow = TRUE)
 {
     if (byrow & nrow(mat) != length(vector)) {
         stop("if byrow=TRUE, vector's length should have length nrow(mat)")
@@ -305,5 +305,5 @@ minmax_scale <- function(matrix,min=1,max=1000,na.rm=TRUE){
 #' Backbone and Infinity antibodies specification for the data object infinityFlow::steady_state_lnug
 #' @docType data
 #' @format a data.frame specifying the Infinity antibody targets and isotypes for each flowFrame of the steady_state_lung flowSet
-#' @usage data(steady_state_lung_backbone_specification) 
+#' @usage data(steady_state_lung_backbone_specification)
 "steady_state_lung_backbone_specification"

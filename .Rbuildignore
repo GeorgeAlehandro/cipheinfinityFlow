@@ -1,3 +1,5 @@
 ^Meta$
 Readme.md
 ^doc$
+^.*\.Rproj$
+^\.Rproj\.user$
