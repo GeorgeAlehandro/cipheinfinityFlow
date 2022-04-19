@@ -20,7 +20,7 @@ logicle_transform_input <- function(
                                  annot=read.table(paths["annotation"],sep=",",header=TRUE,stringsAsFactors=FALSE),
                                  verbose=TRUE
                                  ){
-    
+
     ## ##################
     ## Computing parameters for each channel for each project using the code from flowCore's estimateLogicle
     ## ##################
@@ -28,7 +28,7 @@ logicle_transform_input <- function(
         message("Logicle-transforming the data")
         message("\tBackbone data")
     }
-    
+
     transforms_chan <- setNames(
         lapply(
             chans,
@@ -64,7 +64,7 @@ logicle_transform_input <- function(
             logicleTransform(w=w,t=t,m=m,a=a)
         }
     )
-    
+
     if(verbose){
         message("\tWriting to disk")
     }
@@ -77,7 +77,7 @@ logicle_transform_input <- function(
     if(verbose){
         message("\tTransforming expression matrix")
     }
-    
+
     for(chan in chans){
         xp[,chan] <- transforms_chan[[chan]](xp[,chan])
     }
@@ -93,7 +93,7 @@ logicle_transform_input <- function(
     if(verbose){
         message("\tWriting to disk")
     }
-    
+
     saveRDS(xp,file=file.path(paths["rds"],"xp_transformed.Rds"))
     invisible()
 }

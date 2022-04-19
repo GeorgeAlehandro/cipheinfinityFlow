@@ -70,12 +70,10 @@ infinity_flow <- function(
     if(length(extra_args_regression_params) != length(regression_functions)){
         stop("extra_args_regression_params and regression_functions should be lists of the same lengths")
     }
-
     if(any(!isotype %in% annotation)){
         stop("The following values from the isotype argument are not matching any of the values from the annotation argument: ", paste0(isotype[!isotype %in% annotation], collapse = ", "))
     }
     ##/!\ Potentially add a check here to make sure parameters are consistent with FCS files
-
     settings <- initialize(
       vector_of_file_absolute_paths = vector_of_file_absolute_paths,
         path_to_output=path_to_output,
@@ -99,6 +97,7 @@ infinity_flow <- function(
         paths=paths,
         extra_args_read_FCS=extra_args_read_FCS,
         name_of_PE_parameter=name_of_PE_parameter,
+        annotation = annotation,
         verbose=verbose
     )
 
@@ -188,7 +187,6 @@ initialize <- function(
                     verbose=TRUE,
                     regression_functions=regression_functions
                     ){
-
 
     if(path_to_intermediary_results==tempdir()){
         tmpdir = path_to_intermediary_results
@@ -281,7 +279,8 @@ initialize <- function(
             paths=paths,
             chans=chans,
             name_of_PE_parameter=name_of_PE_parameter,
-            regression_functions=regression_functions
+            regression_functions=regression_functions,
+            annotation = annotation
         )
     )
 }

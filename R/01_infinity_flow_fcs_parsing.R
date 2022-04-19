@@ -14,32 +14,37 @@ subsample_data <- function(
                         paths,
                         extra_args_read_FCS,
                         name_of_PE_parameter,
+                        annotation,
                         verbose=TRUE
                         ){
+
     ## Subsampling
     if(verbose){
         message("Parsing and subsampling input data")
         message("\tDownsampling to ",input_events_downsampling," events per input file")
     }
+  new_name <- names(annotation)
   files <- vector_of_file_absolute_paths
-    invisible(
-        lapply(
-            files,
-            function(file){
-                res <- do.call(read.FCS,c(list(filename=file),extra_args_read_FCS))
-                w <- sort(sample(seq_len(nrow(res)),min(input_events_downsampling,nrow(res))))
-                res <- res[w,]
-                write.FCS(res,file.path(paths["subset"],basename(file)))
-            }
-        )
-    )
+  create_file <- function(file, new_name){
+        res <- do.call(read.FCS,c(list(filename=file),extra_args_read_FCS))
+        w <- sort(sample(seq_len(nrow(res)),min(input_events_downsampling,nrow(res))))
+        res <- res[w,]
+        write.FCS(res,file.path(paths["subset"],new_name))
+    }
+
+    for (i in 1:(length(files))){
+      create_file(files[i],new_name[i])
+    }
+
 
     ## convert to .Rds
     if(verbose){
         message("\tConcatenating expression matrices")
     }
     files <- list.files(paths["subset"],full.names=TRUE,recursive=FALSE,include.dirs=FALSE,pattern=".fcs")
-    ns <- setNames(integer(length(files)),files)
+   # ns <- setNames(integer(length(files)),files)
+    #files <- names(annotation)
+    ns <- setNames(integer(length(names(annotation))),names(annotation))
     xp <- lapply(
         files,
         function(file){
@@ -54,7 +59,7 @@ subsample_data <- function(
             xp
         }
     )
-    names(xp) <- files
+    names(xp) <- names(annotation)
     ns <- vapply(xp, nrow, 1L)
     xp <- do.call(rbind,xp)
     ## Map which events originate from which file.
