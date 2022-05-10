@@ -12,61 +12,63 @@
 #' @importFrom flowCore logicleTransform inverseLogicleTransform
 #' @noRd
 logicle_transform_input <- function(
-                                 yvar,
-                                 paths,
-                                 xp=readRDS(file.path(paths["rds"],"xp.Rds")),
-                                 chans=readRDS(file.path(paths["rds"],"chans.Rds")),
-                                 events.code=readRDS(file.path(paths["rds"],"pe.Rds")),
-                                 annot=read.table(paths["annotation"],sep=",",header=TRUE,stringsAsFactors=FALSE),
-                                 verbose=TRUE
-                                 ){
+    yvar,
+    paths,
+    xp=readRDS(file.path(paths["rds"],"xp.Rds")),
+    chans=readRDS(file.path(paths["rds"],"chans.Rds")),
+    events.code=readRDS(file.path(paths["rds"],"pe.Rds")),
+    annot=read.table(paths["annotation"],sep=",",header=TRUE,stringsAsFactors=FALSE),
+    verbose=TRUE,
+    transform = TRUE
+){
 
-    ## ##################
-    ## Computing parameters for each channel for each project using the code from flowCore's estimateLogicle
-    ## ##################
+  ## ##################
+  ## Computing parameters for each channel for each project using the code from flowCore's estimateLogicle
+  ## ##################
+  if(transform){
     if(verbose){
-        message("Logicle-transforming the data")
-        message("\tBackbone data")
+      message("Logicle-transforming the data")
+      message("\tBackbone data")
     }
 
     transforms_chan <- setNames(
-        lapply(
-            chans,
-            function(x){
-                data <- xp[,x]
-                t <- max(data)
-                m <- 4.5
-                q <- 0.05
-                r <- .Machine$double.eps + quantile(data, q)
-                w <- max((m-log10(t/abs(r)))/2,0.1)
-                w <- min(w,m/2)
-                a <- 0
-                logicleTransform(w=w,t=t,m=m,a=a) ##Just use summary() to retrive the parameters
-            }
-        ),
-        chans
+      lapply(
+        chans,
+        function(x){
+          data <- xp[,x]
+          t <- max(data)
+          m <- 4.5
+          q <- 0.05
+          r <- .Machine$double.eps + quantile(data, q)
+          w <- max((m-log10(t/abs(r)))/2,0.1)
+          w <- min(w,m/2)
+          a <- 0
+          logicleTransform(w=w,t=t,m=m,a=a) ##Just use summary() to retrive the parameters
+        }
+      ),
+      chans
     )
 
     if(verbose){
-        message("\tExploratory data")
+      message("\tExploratory data")
     }
     transforms_pe <- lapply(
-        split(xp[,yvar], events.code),
-        function(x){
-            data <- x
-            t <- max(data)
-            m <- 4.5
-            q <- 0.05
-            r <- .Machine$double.eps + quantile(data, q)
-            w <- max((m-log10(t/abs(r)))/2,0.1)
-            w <- min(w,m/2)
-            a <- 0
-            logicleTransform(w=w,t=t,m=m,a=a)
-        }
+      split(xp[,yvar], events.code),
+      function(x){
+        data <- x
+        t <- max(data)
+        m <- 4.5
+        q <- 0.05
+        r <- .Machine$double.eps + quantile(data, q)
+        w <- max((m-log10(t/abs(r)))/2,0.1)
+        w <- min(w,m/2)
+        a <- 0
+        logicleTransform(w=w,t=t,m=m,a=a)
+      }
     )
 
     if(verbose){
-        message("\tWriting to disk")
+      message("\tWriting to disk")
     }
     saveRDS(transforms_chan,file=file.path(paths["rds"],"transforms_chan.Rds"))
     saveRDS(transforms_pe,file=file.path(paths["rds"],"transforms_pe.Rds"))
@@ -75,25 +77,86 @@ logicle_transform_input <- function(
     ## Exporting transformed expression matrices
     ## ##################
     if(verbose){
-        message("\tTransforming expression matrix")
+      message("\tTransforming expression matrix")
     }
 
     for(chan in chans){
-        xp[,chan] <- transforms_chan[[chan]](xp[,chan])
+      xp[,chan] <- transforms_chan[[chan]](xp[,chan])
     }
 
     d.e <- split(as.data.frame(xp),events.code)
     d.e <- lapply(d.e,as.matrix)
     for(chan in unique(events.code)){
-        d.e[[chan]][,yvar] <- transforms_pe[[chan]](d.e[[chan]][,yvar])
+      d.e[[chan]][,yvar] <- transforms_pe[[chan]](d.e[[chan]][,yvar])
     }
 
     xp <- do.call(rbind,d.e)
 
     if(verbose){
-        message("\tWriting to disk")
+      message("\tWriting to disk")
+    }
+
+    saveRDS(xp,file=file.path(paths["rds"],"xp_transformed.Rds"))
+    invisible()}
+  else({
+    if(verbose){
+      message("Skipping transforming data")
+      message("\tChecking backbone data")
+    }
+
+    transforms_chan <- setNames(
+      lapply(
+        chans,
+        function(x){
+          data <- xp[,x]
+          t <- 1
+        }
+      ),
+      chans
+    )
+
+    if(verbose){
+      message("\tExploratory data")
+    }
+    transforms_pe <- lapply(
+      split(xp[,yvar], events.code),
+      function(x){
+        data <- x
+        t<-1
+      }
+    )
+
+    if(verbose){
+      message("\tWriting to disk")
+    }
+    saveRDS(transforms_chan,file=file.path(paths["rds"],"transforms_chan.Rds"))
+    saveRDS(transforms_pe,file=file.path(paths["rds"],"transforms_pe.Rds"))
+
+    ## ##################
+    ## Exporting transformed expression matrices
+    ## ##################
+    if(verbose){
+      message("\tChecking expression matrix")
+    }
+
+    for(chan in chans){
+      xp[,chan] <- transforms_chan[[chan]](xp[,chan])
+    }
+
+    d.e <- split(as.data.frame(xp),events.code)
+    d.e <- lapply(d.e,as.matrix)
+    for(chan in unique(events.code)){
+      d.e[[chan]][,yvar] <- transforms_pe[[chan]](d.e[[chan]][,yvar])
+    }
+
+    xp <- do.call(rbind,d.e)
+
+    if(verbose){
+      message("\tWriting to disk")
     }
 
     saveRDS(xp,file=file.path(paths["rds"],"xp_transformed.Rds"))
     invisible()
+
+  })
 }

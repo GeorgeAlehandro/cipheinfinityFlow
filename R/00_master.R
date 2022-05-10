@@ -39,7 +39,7 @@ infinity_flow <- function(
 
                        ## Set-up multicore computing. When in doubt, set it to 1
                        cores=1L,
-
+                       transform = TRUE,
                        ## Setting a random seed (for reproducibility despite stochasticity). We enforce reproducibility for the predictions even when doing multicore comparisons.
                        your_random_seed=123,
                        verbose=TRUE,
@@ -105,7 +105,8 @@ infinity_flow <- function(
     logicle_transform_input(
         yvar=name_of_PE_parameter,
         paths=paths,
-        verbose=verbose
+        verbose=verbose,
+        transform = transform
     )
 
     ## Z-score transform each backbone marker for each sample
@@ -145,7 +146,7 @@ infinity_flow <- function(
     )
 
     ## Export of the data and predicted data
-    res <- do.call(export_data,c(list(paths=paths,verbose=verbose),extra_args_export))
+    res <- do.call(export_data,c(list(paths=paths,verbose=verbose,transform = transform),extra_args_export))
 
     ## Plotting
     do.call(plot_results,c(list(paths=paths,verbose=verbose),extra_args_plotting))
