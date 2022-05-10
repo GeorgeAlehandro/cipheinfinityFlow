@@ -41,19 +41,20 @@ export_data <- function(
 
   a <- setNames(as.character(a[,"target",]),a[,"file"])
 
-  if(verbose){
-    message("\tTransforming predictions back to a linear scale")
-  }
+
 
   preds_raw <- preds
-
+  if(transform){
+    if(verbose){
+      message("\tTransforming predictions back to a linear scale")
+    }
   preds <- lapply(preds,function(x){
     for(pe in names(transforms_pe)){
       ilgcl <- inverseLogicleTransform(trans=transforms_pe[[pe]])
       x[,pe] <- ilgcl(x[,pe])
     }
     x
-  })
+  })}
 
   preds <- lapply(
     names(preds),

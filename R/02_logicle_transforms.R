@@ -139,16 +139,18 @@ logicle_transform_input <- function(
       message("\tChecking expression matrix")
     }
 
-    for(chan in chans){
-      xp[,chan] <- transforms_chan[[chan]](xp[,chan])
-    }
+   # for(chan in chans){
+  #    xp[,chan] <- transforms_chan[[chan]](xp[,chan])
+ #   }
 
     d.e <- split(as.data.frame(xp),events.code)
     d.e <- lapply(d.e,as.matrix)
+    # for(chan in unique(events.code)){
+    #   d.e[[chan]][,yvar] <- transforms_pe[[chan]](d.e[[chan]][,yvar])
+    # }
     for(chan in unique(events.code)){
-      d.e[[chan]][,yvar] <- transforms_pe[[chan]](d.e[[chan]][,yvar])
+      d.e[[chan]][,yvar] <- d.e[[chan]][,yvar]
     }
-
     xp <- do.call(rbind,d.e)
 
     if(verbose){
