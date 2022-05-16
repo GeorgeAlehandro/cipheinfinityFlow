@@ -42,8 +42,9 @@ subsample_data <- function(
         message("\tConcatenating expression matrices")
     }
     files <- list.files(paths["subset"],full.names=TRUE,recursive=FALSE,include.dirs=FALSE,pattern=".fcs")
-   # ns <- setNames(integer(length(files)),files)
-    #files <- names(annotation)
+    #Crucial to sort the file names the same way they would be sorted by the OS
+    #Data names will be protected this way
+    files <- gtools::mixedsort(files)
     ns <- setNames(integer(length(names(annotation))),names(annotation))
     xp <- lapply(
         files,
