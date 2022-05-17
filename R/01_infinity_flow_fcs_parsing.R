@@ -44,7 +44,11 @@ subsample_data <- function(
     files <- list.files(paths["subset"],full.names=TRUE,recursive=FALSE,include.dirs=FALSE,pattern=".fcs")
     #Crucial to sort the file names the same way they would be sorted by the OS
     #Data names will be protected this way
+    print('files before sorting')
+    print(files)
     files <- gtools::mixedsort(files)
+    print('files after sorting')
+    print(files)
     ns <- setNames(integer(length(names(annotation))),names(annotation))
     xp <- lapply(
         files,
