@@ -14,7 +14,8 @@ standardize_backbone_data_across_wells <- function(
                                                 xp=readRDS(file.path(paths["rds"],"xp_transformed.Rds")),
                                                 chans=readRDS(file.path(paths["rds"],"chans.Rds")),
                                                 events.code=readRDS(file.path(paths["rds"],"pe.Rds")),
-                                                verbose=TRUE
+                                                verbose=TRUE,
+                                                transform = transform
                                                 ){
     if(verbose){
         message("Harmonizing backbone data")
@@ -34,5 +35,8 @@ standardize_backbone_data_across_wells <- function(
     }    
     
     saveRDS(xp,file=file.path(paths["rds"],"xp_transformed_scaled.Rds"))
+    if (!transform){
+      xp = xp.RDS
+    }
     invisible()
 }
