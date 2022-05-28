@@ -113,7 +113,8 @@ infinity_flow <- function(
     standardize_backbone_data_across_wells(
         yvar=name_of_PE_parameter,
         paths=paths,
-        verbose=verbose
+        verbose=verbose,
+      transform = transform
     )
 
     ## Regression models training and predictions
