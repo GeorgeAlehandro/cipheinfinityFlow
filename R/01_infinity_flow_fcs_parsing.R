@@ -43,12 +43,8 @@ subsample_data <- function(
     }
     files <- list.files(paths["subset"],full.names=TRUE,recursive=FALSE,include.dirs=FALSE,pattern=".fcs")
     #Crucial to sort the file names the same way they would be sorted by the OS
-    #Data names will be protected this way
-    print('files before sorting')
-    print(files)
+    #File names order will be preserved just like the user's selection on Shiny's UI this way
     files <- gtools::mixedsort(files)
-    print('files after sorting')
-    print(files)
     ns <- setNames(integer(length(names(annotation))),names(annotation))
     xp <- lapply(
         files,
@@ -81,6 +77,5 @@ subsample_data <- function(
     )
     saveRDS(xp,file=file.path(paths["rds"],"xp.Rds"))
     saveRDS(events.code,file=file.path(paths["rds"],"pe.Rds"))
-    print('done script 1')
     invisible()
 }
