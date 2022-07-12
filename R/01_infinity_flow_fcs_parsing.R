@@ -81,5 +81,6 @@ subsample_data <- function(
     )
     saveRDS(xp,file=file.path(paths["rds"],"xp.Rds"))
     saveRDS(events.code,file=file.path(paths["rds"],"pe.Rds"))
+    print('done script 1')
     invisible()
 }
