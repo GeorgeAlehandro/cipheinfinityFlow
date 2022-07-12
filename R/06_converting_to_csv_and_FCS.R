@@ -44,7 +44,6 @@ export_data <- function(
 
 
   preds_raw <- preds
-  if(transform){
     if(verbose){
       message("\tTransforming predictions back to a linear scale")
     }
@@ -54,7 +53,7 @@ export_data <- function(
       x[,pe] <- ilgcl(x[,pe])
     }
     x
-  })}
+  })
 
   preds <- lapply(
     names(preds),
