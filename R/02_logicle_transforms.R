@@ -20,16 +20,15 @@ logicle_transform_input <- function(
     annot=read.table(paths["annotation"],sep=",",header=TRUE,stringsAsFactors=FALSE),
     verbose=TRUE
 ){
-
+  
   ## ##################
   ## Computing parameters for each channel for each project using the code from flowCore's estimateLogicle
   ## ##################
-  if(transform){
     if(verbose){
       message("Logicle-transforming the data")
       message("\tBackbone data")
     }
-
+    
     transforms_chan <- setNames(
       lapply(
         chans,
@@ -47,7 +46,7 @@ logicle_transform_input <- function(
       ),
       chans
     )
-
+    
     if(verbose){
       message("\tExploratory data")
     }
@@ -65,92 +64,36 @@ logicle_transform_input <- function(
         logicleTransform(w=w,t=t,m=m,a=a)
       }
     )
-
+    
     if(verbose){
       message("\tWriting to disk")
     }
     saveRDS(transforms_chan,file=file.path(paths["rds"],"transforms_chan.Rds"))
     saveRDS(transforms_pe,file=file.path(paths["rds"],"transforms_pe.Rds"))
-
+    
     ## ##################
     ## Exporting transformed expression matrices
     ## ##################
     if(verbose){
       message("\tTransforming expression matrix")
     }
-
+    
     for(chan in chans){
       xp[,chan] <- transforms_chan[[chan]](xp[,chan])
     }
-
+    
     d.e <- split(as.data.frame(xp),events.code)
     d.e <- lapply(d.e,as.matrix)
     for(chan in unique(events.code)){
       d.e[[chan]][,yvar] <- transforms_pe[[chan]](d.e[[chan]][,yvar])
     }
-
+    
     xp <- do.call(rbind,d.e)
-
+    
     if(verbose){
       message("\tWriting to disk")
     }
-
-    saveRDS(xp,file=file.path(paths["rds"],"xp_transformed.Rds"))
-    invisible()}
-  else({
-    if(verbose){
-      message("Skipping transforming data")
-      message("\tChecking backbone data")
-    }
-
-    transforms_chan <- setNames(
-      lapply(
-        chans,
-        function(x){
-          data <- xp[,x]
-          t <- 1
-        }
-      ),
-      chans
-    )
-
-    if(verbose){
-      message("\tExploratory data")
-    }
-    transforms_pe <- lapply(
-      split(xp[,yvar], events.code),
-      function(x){
-        data <- x
-        t<-1
-      }
-    )
-
-    if(verbose){
-      message("\tWriting to disk")
-    }
-    saveRDS(transforms_chan,file=file.path(paths["rds"],"transforms_chan.Rds"))
-    saveRDS(transforms_pe,file=file.path(paths["rds"],"transforms_pe.Rds"))
-
-    ## ##################
-    ## Exporting transformed expression matrices
-    ## ##################
-    if(verbose){
-      message("\tChecking expression matrix")
-    }
-
-    d.e <- split(as.data.frame(xp),events.code)
-    d.e <- lapply(d.e,as.matrix)
-    for(chan in unique(events.code)){
-      d.e[[chan]][,yvar] <- d.e[[chan]][,yvar]
-    }
-    xp <- do.call(rbind,d.e)
-
-    if(verbose){
-      message("\tWriting to disk")
-    }
-
+    
     saveRDS(xp,file=file.path(paths["rds"],"xp_transformed.Rds"))
     invisible()
-
-  })
 }
